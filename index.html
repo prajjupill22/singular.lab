@@ -1,6 +1,64 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SINGULARITY.LAB</title><link rel="stylesheet" href="styles.css"><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script></head><body>
-<div class="scanlines"></div><header><div><b>SINGULARITY<span>.LAB</span></b><small>HAND INTERACTION EXPERIMENT</small></div><div class="topstat">EXPERIMENT SESSION <strong>SIGMA-7</strong></div><div class="clock" id="clock">00:00:00</div></header>
-<aside class="left"><section><h3>// CONTROL CENTER</h3><div class="nav active">DASHBOARD</div><div class="nav">CAMERA</div><div class="nav">TRACKING</div><div class="nav">SYSTEMS</div><div class="nav">CALIBRATION</div><div class="nav">EXPERIMENTS</div></section><section><h3>SYSTEM STATUS</h3><p>CAMERA <i id="camStatus">OFFLINE</i></p><p>TRACKING <i id="trackStatus">OFFLINE</i></p><p>HAND(S) <i id="hands">0</i></p><p>RENDER <i>WEBGL</i></p><p>ENGINE <i>READY</i></p></section><section class="core"><h3>ENERGY CORE</h3><div class="coreOrb"></div><strong id="energy">0%</strong><div class="bar"><span id="energyBar"></span></div></section></aside>
-<main><div class="stage" id="stage"><video id="video" autoplay muted playsinline></video><canvas id="fx"></canvas><div class="hud leftHud"><b>HAND TRACKING</b><div class="handbox" id="handbox">WAITING</div><small>INDEX TIP // <span id="gesture">NO SIGNAL</span></small></div><div class="hud rightHud"><b>ANOMALY DATA</b><p>TYPE <span>SINGULARITY</span></p><p>STAGE <span id="stageText">DORMANT</span></p><p>ENERGY <span id="energyText">0%</span></p><p>STABILITY <span id="stability">100%</span></p></div><div class="centerPrompt" id="prompt"><strong>INITIALIZE EXPERIMENT</strong><button id="start">ENABLE CAMERA</button><small id="message">Camera permission is required. HTTPS recommended.</small></div><div class="warning" id="warning">⚠ ANOMALY OVERCHARGE — RELEASE FINGER</div></div>
-<div class="protocols"><div class="proto active"><b>01 // POINT</b><small>SINGULARITY</small></div><div class="proto"><b>02 // PINCH</b><small>GRAVITY WELL</small></div><div class="proto"><b>03 // PALM</b><small>PLASMA CORE</small></div><div class="proto"><b>04 // FIST</b><small>COLLAPSE</small></div><div class="proto"><b>05 // SWIPE</b><small>RIFT</small></div><div class="proto"><b>06 // TWO HANDS</b><small>PORTAL</small></div></div></main>
-<footer><span>NEURAL INTERFACE <b>ONLINE</b></span><span>EXPERIMENT MODE <strong id="mode">STANDBY</strong></span><span>S.LAB v1.0 // WEBGL</span></footer><script type="module" src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#030406">
+<title>SINGULARITY.LAB // Neural Interface</title>
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div class="noise"></div><div class="scanlines"></div>
+<header class="topbar">
+  <div class="brand"><div><b>SINGULARITY<span>.LAB</span></b><small>NEURAL MATTER / HAND INTERACTION RESEARCH NODE</small></div></div>
+  <div class="session"><span>SESSION</span><b>SIGMA-7</b><i></i><span>LINK</span><strong id="linkState">STANDBY</strong></div>
+  <div class="clock" id="clock">00:00:00</div>
+</header>
+<aside class="sidebar">
+  <section><h3>// CONTROL CENTER</h3>
+    <div class="nav active">01&nbsp;&nbsp;DASHBOARD</div><div class="nav">02&nbsp;&nbsp;CAMERA</div><div class="nav">03&nbsp;&nbsp;TRACKING</div><div class="nav">04&nbsp;&nbsp;SYSTEMS</div><div class="nav">05&nbsp;&nbsp;CALIBRATION</div><div class="nav">06&nbsp;&nbsp;EXPERIMENTS</div>
+  </section>
+  <section><h3>// SYSTEM TELEMETRY</h3>
+    <p>CAMERA <b id="camStatus" class="bad">OFFLINE</b></p><p>TRACKING <b id="trackStatus" class="bad">OFFLINE</b></p><p>HANDS <b id="hands">0</b></p><p>WEBGL <b class="ok">READY</b></p><p>POST FX <b class="ok">BLOOM</b></p><p>INPUT <b id="inputStatus">WAIT</b></p>
+  </section>
+  <section class="corePanel"><h3>// ENERGY CORE</h3><div class="miniCore"><div></div></div><strong id="energy">0%</strong><div class="bar"><span id="energyBar"></span></div><small>FIELD CHARGE / <span id="chargeRate">0.00</span> u/s</small></section>
+  <section class="readouts"><h3>// FIELD METRICS</h3><p>GRAVITY <b id="gravity">1.00×</b></p><p>ENTROPY <b id="entropy">0.00</b></p><p>RADIUS <b id="radius">1.00</b></p><p>STABILITY <b id="stability">100%</b></p></section>
+</aside>
+<main>
+  <div class="stage" id="stage">
+    <video id="video" autoplay muted playsinline></video>
+    <div class="videoShade"></div><canvas id="fx"></canvas>
+    <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
+    <div class="hud leftHud"><div class="hudTitle">HAND TRACKING <span id="trackDot"></span></div>
+      <div class="handbox"><span id="handIcon">○</span><b id="handState">WAITING FOR INPUT</b></div>
+      <div class="hudRow">INDEX VECTOR <span id="vector">— — —</span></div>
+      <div class="hudRow">GESTURE <span id="gesture">NO SIGNAL</span></div>
+      <div class="hudRow">CONFIDENCE <span id="confidence">0%</span></div>
+    </div>
+    <div class="hud rightHud"><div class="hudTitle">ANOMALY TELEMETRY</div>
+      <div class="hudRow">TYPE <span>SINGULARITY</span></div><div class="hudRow">STATE <span id="stageText">DORMANT</span></div>
+      <div class="hudRow">FIELD ENERGY <span id="energyText">0%</span></div><div class="hudRow">STABILITY <span id="hudStability">100%</span></div>
+      <div class="meter"><i id="fieldMeter"></i></div>
+    </div>
+    <div class="centerPrompt" id="prompt">
+      <div class="bootGlyph">◎</div><strong>INITIALIZE EXPERIMENT</strong>
+      <p>Activate the camera to bind the singularity to your index vector. Hand landmarks are processed locally in the browser.</p>
+      <button id="start"><span>●</span> ENABLE CAMERA + TRACKING</button>
+      <small id="message">Camera access requires HTTPS or localhost.</small>
+    </div>
+    <div class="warning" id="warning">⚠ FIELD LIMIT — RELEASE INDEX TO PREVENT COLLAPSE</div>
+    <div class="bottomTelemetry"><span>COORD <b id="coords">000.00 / 000.00 / 000.00</b></span><span>PARTICLES <b>18,400</b></span><span>FPS <b id="fps">60</b></span></div>
+  </div>
+  <div class="protocols">
+    <div class="proto active"><em>01</em><b>POINT</b><small>SINGULARITY</small></div>
+    <div class="proto"><em>02</em><b>PINCH</b><small>GRAVITY WELL</small></div>
+    <div class="proto"><em>03</em><b>PALM</b><small>PLASMA CORE</small></div>
+    <div class="proto"><em>04</em><b>FIST</b><small>COLLAPSE</small></div>
+    <div class="proto"><em>05</em><b>SWIPE</b><small>RIFT VECTOR</small></div>
+    <div class="proto"><em>06</em><b>TWO HANDS</b><small>PORTAL</small></div>
+  </div>
+</main>
+<footer><span>NEURAL INTERFACE <b>ONLINE</b></span><span>LOCAL VISION ENGINE <strong id="mode">STANDBY</strong></span><span>S.LAB // BUILD 2.0</span></footer>
+<script type="module" src="app.js"></script>
+</body></html>
