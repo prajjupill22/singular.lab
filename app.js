@@ -150,24 +150,143 @@ async function enableCamera(){
 }
 
 async function initHandTracking(){
+  // The Tasks-Vision tracker is preferred. If it cannot download/initialize
+  // (common with CDN/CORS/WebGL issues on GitHub Pages), automatically fall
+  // back to the proven MediaPipe Hands runtime.
+  trackingReady=false;
+  setStatus(trackStatus,'LOADING',false);
+  $('#trackDot').style.color='var(--amber)';
+  message.textContent='Loading vision engine…';
+
+  const setTrackingError=(err)=>{
+    console.error('Hand tracking error:',err);
+    trackingReady=false;
+    setStatus(trackStatus,'FAILED',false);
+    $('#trackDot').style.color='var(--red)';
+    mode.textContent='CAMERA ONLY';
+    const detail = err?.message || String(err);
+    message.textContent='Tracking failed: '+detail+' — retrying with compatibility mode…';
+  };
+
+  // Preferred: MediaPipe Tasks Vision.
   try{
-    message.textContent='Loading local vision model…';
-    const {HandLandmarker,FilesetResolver}=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm');
-    const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
+    const {HandLandmarker,FilesetResolver}=await import(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm'
+    );
+    const vision=await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
+    );
     const model='https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+
     let tracker;
-    try{tracker=await HandLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:model,delegate:'GPU'},runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5});}
-    catch(gpuErr){console.warn('GPU hand tracker unavailable, using CPU',gpuErr);tracker=await HandLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:model,delegate:'CPU'},runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:.45,minHandPresenceConfidence:.45,minTrackingConfidence:.45});}
-    trackingReady=true;setStatus(trackStatus,'ACTIVE',true);$('#trackDot').style.color='var(--green)';message.textContent='Vision link established. Show one hand to the camera.';mode.textContent='VISION ONLINE';
-    let lastVideoTime=-1;
+    try{
+      tracker=await HandLandmarker.createFromOptions(vision,{
+        baseOptions:{modelAssetPath:model,delegate:'GPU'},
+        runningMode:'VIDEO',numHands:2,
+        minHandDetectionConfidence:.35,
+        minHandPresenceConfidence:.35,
+        minTrackingConfidence:.35
+      });
+    }catch(gpuErr){
+      console.warn('GPU hand tracker unavailable; using CPU.',gpuErr);
+      tracker=await HandLandmarker.createFromOptions(vision,{
+        baseOptions:{modelAssetPath:model,delegate:'CPU'},
+        runningMode:'VIDEO',numHands:2,
+        minHandDetectionConfidence:.30,
+        minHandPresenceConfidence:.30,
+        minTrackingConfidence:.30
+      });
+    }
+
+    trackingReady=true;
+    setStatus(trackStatus,'ACTIVE',true);
+    $('#trackDot').style.color='var(--green)';
+    message.textContent='Vision link established. Show one hand to the camera.';
+    mode.textContent='VISION ONLINE';
+
+    let lastVideoTime=-1, busy=false;
     const loop=async()=>{
-      if(video.readyState>=2&&video.videoWidth&&video.currentTime!==lastVideoTime){
+      if(!busy && video.readyState>=2 && video.videoWidth && video.currentTime!==lastVideoTime){
+        busy=true;
         lastVideoTime=video.currentTime;
-        try{const result=tracker.detectForVideo(video,performance.now());processHands(result.landmarks||[],result.handednesses||[]);}catch(e){console.warn('Frame inference skipped',e);}
+        try{
+          const result=tracker.detectForVideo(video,Math.round(performance.now()));
+          processHands(result?.landmarks||[],result?.handednesses||[]);
+        }catch(e){ console.warn('Vision frame skipped:',e); }
+        busy=false;
       }
       requestAnimationFrame(loop);
-    };loop();
-  }catch(e){console.error(e);setStatus(trackStatus,'FAILED',false);mode.textContent='CAMERA ONLY';message.textContent='Camera is active, but the vision model could not load. Check network access and reload.';}
+    };
+    loop();
+    return;
+  }catch(tasksErr){
+    setTrackingError(tasksErr);
+    console.warn('Tasks Vision unavailable. Falling back to MediaPipe Hands.',tasksErr);
+  }
+
+  // Compatibility fallback: classic MediaPipe Hands. This avoids the
+  // "TRACKING FAILED" dead-end when the Tasks runtime/model is blocked.
+  try{
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469404/hands.js');
+    if(typeof window.Hands!=='function') throw new Error('MediaPipe Hands runtime did not load');
+
+    const hands=new window.Hands({
+      locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469404/${file}`
+    });
+    hands.setOptions({
+      maxNumHands:2,
+      modelComplexity:1,
+      minDetectionConfidence:.35,
+      minTrackingConfidence:.35
+    });
+
+    hands.onResults((results)=>{
+      const landmarks=results?.multiHandLandmarks||[];
+      processHands(landmarks,[]);
+      if(landmarks.length){
+        trackingReady=true;
+        setStatus(trackStatus,'ACTIVE',true);
+        $('#trackDot').style.color='var(--green)';
+        mode.textContent='COMPATIBILITY VISION';
+        message.textContent='Hand tracking active — compatibility vision mode.';
+      }
+    });
+
+    trackingReady=true;
+    setStatus(trackStatus,'ACTIVE',true);
+    $('#trackDot').style.color='var(--green)';
+    mode.textContent='COMPATIBILITY VISION';
+    message.textContent='Compatibility vision ready. Show your hand to the camera.';
+
+    let busy=false;
+    const loop=async()=>{
+      if(!busy && video.readyState>=2 && video.videoWidth){
+        busy=true;
+        try{ await hands.send({image:video}); }
+        catch(e){ console.warn('Compatibility frame skipped:',e); }
+        busy=false;
+      }
+      requestAnimationFrame(loop);
+    };
+    loop();
+  }catch(fallbackErr){
+    console.error('All hand tracking engines failed:',fallbackErr);
+    setStatus(trackStatus,'FAILED',false);
+    $('#trackDot').style.color='var(--red)';
+    mode.textContent='CAMERA ONLY';
+    message.textContent='Camera works, but the vision engine could not load. Check that GitHub Pages has internet access, then reload.';
+  }
+}
+
+function loadScript(src){
+  return new Promise((resolve,reject)=>{
+    const existing=[...document.scripts].find(s=>s.src===src);
+    if(existing){ existing.addEventListener('load',resolve,{once:true}); existing.addEventListener('error',reject,{once:true}); return; }
+    const s=document.createElement('script');
+    s.src=src; s.async=true;
+    s.onload=resolve; s.onerror=()=>reject(new Error('Could not load vision compatibility runtime'));
+    document.head.appendChild(s);
+  });
 }
 
 function processHands(list,handed){
